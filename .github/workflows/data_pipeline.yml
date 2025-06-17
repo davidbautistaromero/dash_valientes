@@ -1,0 +1,36 @@
+name: Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 2 * * 1/2'   # corre cada 2 semanas los lunes a las 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  extract-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configurar credenciales GCP
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "$GCP_SERVICE_ACCOUNT_JSON" > service_account.json
+        shell: bash
+
+      - name: Extraer y guardar datos
+        run: python scripts/etl.py
+
+      - name: Subir CSV a Google Drive
+        env:
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          GCP_SERVICE_ACCOUNT_PATH: service_account.json
+        run: python scripts/upload_to_drive.py

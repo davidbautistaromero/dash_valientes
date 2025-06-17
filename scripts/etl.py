@@ -93,7 +93,7 @@ def etl_spoa_process():
     escnna['total_victimas'] = escnna['total_victimas'].astype('int')
 
     # Load
-    escnna.to_csv("Conteo_de_Victimas_ESCNNA_Fiscalia.csv", 
+    escnna.to_excel("Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx", 
                     index=False)
     
 
