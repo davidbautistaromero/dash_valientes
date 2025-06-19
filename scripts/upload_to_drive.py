@@ -25,5 +25,4 @@ def upload_xlsx(local_path, filename):
 
 if __name__=='__main__':
     upload_xlsx("Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx","Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx")
-    upload_xlsx("proyecciones_pob_2005_2019.xlsx","proyecciones_pob_2005_2019.xlsx")
-    upload_xlsx("proyecciones_pob_2020_2050.xlsx","proyecciones_pob_2020_2050.xlsx")
+    upload_xlsx("proyecciones_pob_2005_2050.xlsx","proyecciones_pob_2005_2019.xlsx")
