@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 
 import sodapy
 from sodapy import Socrata
@@ -145,6 +146,46 @@ def etl_dane_process(links):
               ## Load 
               df_menores.to_excel(name, index=False)
 
+def concat_dane_files():
+    """
+    Concatena verticalmente los dos archivos de proyecciones de población del DANE
+    y elimina los archivos originales.
+    """
+    try:
+        # Leer los dos archivos
+        print("Leyendo archivos de proyecciones de población...")
+        df_2005_2019 = pd.read_excel("proyecciones_pob_2005_2019.xlsx")
+        df_2020_2050 = pd.read_excel("proyecciones_pob_2020_2050.xlsx")
+        
+        # Concatenar verticalmente
+        print("Concatenando archivos...")
+        df_combined = pd.concat([df_2005_2019, df_2020_2050], axis=0, ignore_index=True)
+        
+        # Ordenar por departamento y año para mejor organización
+        df_combined = df_combined.sort_values(['DP', 'AÑO']).reset_index(drop=True)
+        
+        # Guardar archivo combinado
+        output_filename = "proyecciones_pob_2005_2050.xlsx"
+        print(f"Guardando archivo combinado como {output_filename}...")
+        df_combined.to_excel(output_filename, index=False)
+        
+        # Eliminar archivos originales
+        print("Eliminando archivos originales...")
+        os.remove("proyecciones_pob_2005_2019.xlsx")
+        os.remove("proyecciones_pob_2020_2050.xlsx")
+        
+        print(f"Proceso completado. Archivo combinado guardado como {output_filename}")
+        print(f"Registros en archivo combinado: {len(df_combined)}")
+        
+        return df_combined
+        
+    except FileNotFoundError as e:
+        print(f"Error: No se encontró uno de los archivos necesarios: {e}")
+        return None
+    except Exception as e:
+        print(f"Error durante la concatenación: {e}")
+        return None
+
 # Call the ETL process functions
 etl_spoa_process()
 
@@ -152,3 +193,6 @@ links = {"proyecciones_pob_2005_2019.xlsx": r"https%3A%2F%2Fwww.dane.gov.co%2Ffi
          "proyecciones_pob_2020_2050.xlsx": r"https%3A%2F%2Fwww.dane.gov.co%2Ffiles%2Fcenso2018%2Fproyecciones-de-poblacion%2FDepartamental%2FDCD-area-sexo-edad-proyepoblacion-dep-2020-2050-ActPostCOVID-19.xlsx"}
 
 etl_dane_process(links)
+
+# Concatenar los archivos del DANE
+concat_dane_files()
