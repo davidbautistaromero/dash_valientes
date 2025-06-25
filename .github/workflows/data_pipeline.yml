@@ -2,7 +2,7 @@ name: Data Pipeline
 
 on:
   schedule:
-    - cron: '0 2 * * 1/2'   # corre cada 2 semanas los lunes a las 02:00 UTC
+    - cron: '0 2 1-7,15-21 * 1'   
   workflow_dispatch:
 
 jobs:
