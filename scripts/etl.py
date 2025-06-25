@@ -75,7 +75,7 @@ def etl_spoa_process():
                    'TRATA DE PERSONAS TRANSNACIONAL ART. 188A CUANDO LA FINALIDAD SEA LA SERVIDUMBRE',
                    'TURISMO SEXUAL. ART. 219']
 
-    escnna.drop(escnna.loc[(escnna['delito'].isin(delitos_nna)) & (escnna['aplica_nna']=='NO')].index, inplace=True)
+    escnna = escnna.loc[(escnna['delito'].isin(delitos_nna)) & (escnna['aplica_nna'].strip().upper()=='SI')]
 
     escnna['Type'] = 'ESCNNA'
     escnna.loc[(escnna['delito'].str.contains('TRATA')) | (escnna['delito'].str.contains('TRAFICO')),'Type'] = 'Trata con NNA'
@@ -91,7 +91,7 @@ def etl_spoa_process():
            'pais_nacimiento', 'aplica_lgbti', 'aplica_nna', 'indigena',
            'afrodescendiente', 'total_victimas', 'delito', 'agravante', 'Type']
 
-    escnna['total_victimas'] = escnna['total_victimas'].astype('int')
+    escnna['total_victimas'] = pd.to_numeric(escnna['total_victimas'], errors='coerce').fillna(0).astype(int)
 
     # Load
     escnna.to_excel("Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx", 
