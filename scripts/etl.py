@@ -75,7 +75,7 @@ def etl_spoa_process():
                    'TRATA DE PERSONAS TRANSNACIONAL ART. 188A CUANDO LA FINALIDAD SEA LA SERVIDUMBRE',
                    'TURISMO SEXUAL. ART. 219']
 
-    escnna = escnna.loc[(escnna['delito'].isin(delitos_nna)) & (escnna['aplica_nna'].notna() & escnna['aplica_nna'].str.strip().str.upper()=='SI')]
+    escnna.drop(escnna.loc[(escnna['delito'].isin(delitos_nna)) & (escnna['aplica_nna'] == 'NO')].index, inplace=True)
 
     escnna['Type'] = 'ESCNNA'
     escnna.loc[(escnna['delito'].str.contains('TRATA')) | (escnna['delito'].str.contains('TRAFICO')),'Type'] = 'Trata con NNA'
@@ -92,6 +92,12 @@ def etl_spoa_process():
            'afrodescendiente', 'total_victimas', 'delito', 'agravante', 'Type']
 
     escnna['total_victimas'] = pd.to_numeric(escnna['total_victimas'], errors='coerce').fillna(0).astype(int)
+
+    # Crear columna para sumar solo víctimas NNA
+    escnna['total_victimas_nna'] = escnna.apply(
+        lambda row: row['total_victimas'] if str(row['aplica_nna']).strip().upper() == 'SI' else 0,
+        axis=1
+    )
 
     # Load
     escnna.to_excel("Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx", 
