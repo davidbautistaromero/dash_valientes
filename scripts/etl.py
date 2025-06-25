@@ -75,7 +75,7 @@ def etl_spoa_process():
                    'TRATA DE PERSONAS TRANSNACIONAL ART. 188A CUANDO LA FINALIDAD SEA LA SERVIDUMBRE',
                    'TURISMO SEXUAL. ART. 219']
 
-    escnna = escnna.loc[(escnna['delito'].isin(delitos_nna)) & (escnna['aplica_nna'].strip().upper()=='SI')]
+    escnna = escnna.loc[(escnna['delito'].isin(delitos_nna)) & (escnna['aplica_nna'].notna() & escnna['aplica_nna'].str.strip().str.upper()=='SI')]
 
     escnna['Type'] = 'ESCNNA'
     escnna.loc[(escnna['delito'].str.contains('TRATA')) | (escnna['delito'].str.contains('TRAFICO')),'Type'] = 'Trata con NNA'
