@@ -15,13 +15,27 @@ drive = build('drive','v3',credentials=creds)
 def upload_xlsx(local_path, filename):
     # busca archivo existente
     q = f"name='{filename}' and '{FOLDER_ID}' in parents"
-    files = drive.files().list(q=q, fields='files(id)').execute().get('files',[])
+    files = drive.files().list(
+        q=q, 
+        fields='files(id)', 
+        supportsAllDrives=True, 
+        includeItemsFromAllDrives=True
+    ).execute().get('files',[])
     media = MediaFileUpload(local_path, mimetype='application/vnd.ms-excel')
     if files:
-        drive.files().update(fileId=files[0]['id'], media_body=media).execute()
+        drive.files().update(
+            fileId=files[0]['id'], 
+            media_body=media,
+            supportsAllDrives=True
+        ).execute()
     else:
         meta = {'name': filename, 'parents':[FOLDER_ID]}
-        drive.files().create(body=meta, media_body=media, fields='id').execute()
+        drive.files().create(
+            body=meta, 
+            media_body=media, 
+            fields='id',
+            supportsAllDrives=True
+        ).execute()
 
 if __name__=='__main__':
     upload_xlsx("Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx","Conteo_de_Victimas_ESCNNA_Fiscalia.xlsx")
