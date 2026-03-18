@@ -1,8 +1,8 @@
-# Observatorio ESCNNA — Dashboard Web
+# Aplicativo de Cifras sobre ESCNNA y Trata con NNA en Colombia
 
 Dashboard interactivo para el análisis de la **Explotación Sexual Comercial de Niñas, Niños y Adolescentes (ESCNNA)** y la **Trata de Personas con NNA** en Colombia.
 
-Reemplaza un flujo anterior basado en Google Drive + Tableau por una solución completamente gratuita, de código abierto y desplegable en la nube.
+Desarrollado por el **Observatorio ESCNNA-Valientes Colombia**. Reemplaza un flujo anterior basado en Google Drive + Tableau por una solución completamente gratuita, de código abierto y desplegable en la nube.
 
 ---
 
@@ -22,7 +22,7 @@ Reemplaza un flujo anterior basado en Google Drive + Tableau por una solución c
 ## Arquitectura general
 
 ```
-GitHub Actions (cron)
+GitHub Actions (cron — 2 veces/mes)
         │
         ▼
   scripts/etl.py          ← Descarga y transforma datos
@@ -31,24 +31,26 @@ GitHub Actions (cron)
         ├── data/poblacion_depto.csv
         └── data/poblacion_mpio.csv
                 │
-                ▼
+                ▼  (commit + push automático al repo)
          scripts/app.py   ← Dash app (Python + Plotly)
                 │
                 ▼
            Render.com      ← Hosting gratuito (Web Service)
 ```
 
-El ETL se ejecuta automáticamente dos veces al mes via GitHub Actions. Los datos quedan como CSV versionados en el repositorio. Render redespliega la app automáticamente al detectar el nuevo commit.
+El ETL se ejecuta automáticamente dos veces al mes via GitHub Actions, actualiza los CSV en el repositorio con un commit automático, y Render redespliega la app al detectar el nuevo push.
 
 ---
 
 ## Fuentes de información
 
 ### 1. SPOA — Fiscalía General de la Nación
-- **Qué contiene:** Registros de casos de delitos sexuales, libertad individual y trata de personas
+- **Qué contiene:** Registros de casos de delitos sexuales, libertad individual y trata de personas con NNA
 - **Acceso:** API pública Socrata (`www.datos.gov.co`, dataset `4mnf-va5w`)
-- **Delitos incluidos:** 23 tipos de delito relacionados con ESCNNA y trata de personas con NNA, clasificados según artículos del Código Penal colombiano (Arts. 141, 188, 213–219A)
-- **Variables clave:** año de denuncia, departamento, municipio, delito, grupo etario, sexo, estado del caso, condición LGBTIQ+, etnia
+- **Grupos de delito incluidos:**
+  - **ESCNNA:** delitos sexuales (Arts. 141, 213–219A Código Penal)
+  - **Trata de Personas:** trata de personas y delitos contra la libertad individual con NNA (Art. 188)
+- **Variables clave:** año de denuncia, departamento, municipio, delito, grupo etario, sexo, etapa del caso, condición LGBTIQ+, etnia
 
 ### 2. DANE — Proyecciones de Población
 
@@ -64,7 +66,7 @@ El ETL se ejecuta automáticamente dos veces al mes via GitHub Actions. Los dato
 
 ### 3. IGAC — Cartografía oficial de Colombia
 - **Formato original:** File Geodatabase (`.gdb`) con capas `Depto` y `Munpio`
-- **CRS original:** ESRI:103599 (proyección local Colombia)
+- **CRS original:** ESRI:103599 (proyección local Colombia) → convertido a EPSG:4326 (WGS84)
 - **Uso:** Base para los mapas coropléticos
 
 ---
@@ -75,35 +77,37 @@ El script `scripts/etl.py` ejecuta tres procesos en secuencia:
 
 ### `etl_spoa_process()`
 1. Extrae registros via API Socrata filtrando por `grupo_delito`
-2. Clasifica y estandariza los 23 tipos de delito ESCNNA
+2. Clasifica y estandariza los 23 tipos de delito ESCNNA y Trata
 3. Descarta registros adultos para delitos que no aplican a NNA
 4. Clasifica víctimas por grupo etario (NIÑA-NIÑO / ADOLESCENTE / ADULTO)
 5. Normaliza nombres de departamento para que coincidan con el GeoJSON
 6. Agrega `cod_dep` (2 dígitos DIVIPOLA) y `cod_mun` (5 dígitos DIVIPOLA) como llaves foráneas
 7. Exporta `data/victimas.csv`
 
-**Cobertura de llaves foráneas:** 100% para `cod_dep`, ~100% para `cod_mun` (los únicos sin match son registros `SIN DATO`).
+**Cobertura de llaves foráneas:** 100% `cod_dep`, ~100% `cod_mun` (sin match solo registros `SIN DATO`).
 
-**Normalización de municipios:** Se aplican tres capas en orden:
+**Normalización de municipios (3 capas):**
 1. Mapeo manual para ~25 municipios con nombres oficiales distintos (ej. `CALI` → `Santiago de Cali`, `CARTAGENA` → `Cartagena De Indias`)
-2. Normalización sin tildes para ~40 municipios con errores tipográficos
+2. Normalización sin tildes para ~40 municipios con variaciones tipográficas
 3. Match exacto case-insensitive para el resto
 
 ### `etl_dane_depto_process()`
 1. Descarga los dos archivos departamentales del DANE
 2. Filtra por `ÁREA GEOGRÁFICA == 'Total'`
 3. Suma edades 0–17 para obtener la población menor de 18 años
-4. Agrega `cod_dep` y exporta `data/poblacion_depto.csv`
+4. Agrega `cod_dep` con zero-padding a 2 dígitos y exporta `data/poblacion_depto.csv`
+
+> **Nota técnica:** Los archivos DANE almacenan `cod_dep` sin zero-padding (ej. `5` en lugar de `05`). El ETL aplica `.str.zfill(2)` al leer de vuelta los Excel intermedios para garantizar consistencia con el `cod_dep` de `victimas.csv`.
 
 ### `etl_dane_mpio_process()`
 Maneja dos archivos con estructuras distintas:
 
-| Archivo | Hoja | Header | Total_0 en col |
+| Archivo | Hoja | Header | `Total_0` en col |
 |---|---|---|---|
-| 2005–2017 | `NuevaMpal` | Fila 12, cols 2/3 invertidas | 178 |
+| 2005–2017 | `NuevaMpal` | Fila 12, cols código/nombre **invertidas** | 178 |
 | 2018–2042 | `PobMunicipalxÁreaSexoEdad` | Doble header filas 8–9 | 211 |
 
-> **Nota importante:** En el archivo 2005–2017 las columnas de código y nombre del municipio están invertidas respecto al archivo 2018–2042. El ETL maneja esto con el parámetro `code_col`/`name_col`. Los códigos del archivo 2005–2017 también requieren zero-padding a 5 dígitos.
+> En el archivo 2005–2017 las columnas de código y nombre del municipio están invertidas respecto al archivo 2018–2042. El ETL lo maneja con los parámetros `code_col`/`name_col`. Los códigos también requieren zero-padding a 5 dígitos.
 
 Exporta `data/poblacion_mpio.csv` con `cod_mun` como llave.
 
@@ -111,19 +115,17 @@ Exporta `data/poblacion_mpio.csv` con `cod_mun` como llave.
 
 ## Creación de los mapas
 
-Los mapas usan polígonos oficiales del IGAC en formato GeoJSON (almacenados en `assets/geojson/`).
+Los mapas usan polígonos oficiales del IGAC en formato GeoJSON (almacenados en `assets/geojson/`). La conversión fue un proceso único ya ejecutado.
 
-### Proceso de conversión (único, ya ejecutado)
+### Proceso de conversión
 
 ```python
 import geopandas as gpd
 
-# Departamentos
+# Departamentos (incluye Bogotá D.C. extraída de la capa de municipios cod=11001)
 gdf = gpd.read_file('assets/departamentos-col.gdb', layer='Depto')
-gdf = gdf.to_crs(epsg=4326)          # WGS84 para web
-gdf = gdf[gdf['DeCodigo'] != '00']   # Eliminar área en litigio
-# Bogotá D.C. se extrae de la capa de municipios (cod 11001)
-# y se agrega como departamento con cod_dep='11'
+gdf = gdf.to_crs(epsg=4326)
+gdf['geometry'] = gdf['geometry'].simplify(0.01, preserve_topology=True)
 gdf.to_file('assets/geojson/departamentos.geojson', driver='GeoJSON')
 
 # Municipios
@@ -133,59 +135,70 @@ gdf['geometry'] = gdf['geometry'].simplify(0.005, preserve_topology=True)
 gdf.to_file('assets/geojson/municipios.geojson', driver='GeoJSON')
 ```
 
-Los archivos `.gdb` originales fueron eliminados del repositorio tras la conversión (peso reducido de ~100MB a ~2.75MB total).
+Los archivos `.gdb` originales fueron eliminados tras la conversión (peso reducido de ~100 MB a ~2.75 MB).
 
 ### Tamaños finales
 
-| Archivo | Registros | Tamaño |
+| Archivo | Polígonos | Tamaño |
 |---|---|---|
 | `departamentos.geojson` | 33 | 0.29 MB |
 | `municipios.geojson` | 1,123 | 2.46 MB |
 
-Los polígonos se unen con los datos via `cod_dep` (departamentos) y `cod_mun` (municipios), ambos en formato DIVIPOLA.
+Los polígonos se unen con los datos via `cod_dep` y `cod_mun` (DIVIPOLA). Los polígonos **sin datos** aparecen en el mapa en gris neutro con tooltip "Sin datos" (implementado con dos trazas `go.Choropleth` apiladas). Los bounds de cada mapa se precalculan al inicio de la app para que el mapa llene el espacio disponible.
 
 ---
 
 ## Lógica del dashboard
 
 ### Filtros
-| Filtro | Campo | Tipo |
+
+| Filtro | Campo origen | Tipo |
 |---|---|---|
-| Año de denuncia | `anio_denuncia` | RangeSlider (2010–2026) |
-| Grupo de delito | `grupo_delito` | Dropdown multi |
+| Año de denuncia | `anio_denuncia` | RangeSlider |
+| Grupo de delito | `grupo_delito` | Dropdown multi — `ESCNNA` / `Trata de Personas` |
 | Departamento | `departamento_hecho` | Dropdown simple |
 | Delito | `delito` | Dropdown multi |
 
-### Mapas (4)
-| Mapa | Métrica |
+> El filtro de año **no afecta** los gráficos históricos (se usan siempre todos los años para mostrar la serie completa).
+
+### Sección: Casos y Víctimas
+
+| Componente | Descripción |
 |---|---|
-| Víctimas por departamento | `SUM(total_victimas_nna)` agrupado por `cod_dep` |
-| Tasa ESCNNA por departamento | `SUM(victimas_nna) / SUM(población_menor_18) × 100.000` |
-| Víctimas por municipio | `SUM(total_victimas_nna)` agrupado por `cod_mun` |
-| Tasa ESCNNA por municipio | `SUM(victimas_nna) / SUM(población_menor_18) × 100.000` |
+| KPIs | Casos registrados y total víctimas en el período seleccionado |
+| Histórico | Barras (víctimas) + línea (casos) en eje Y único — no afectado por filtro de año |
+| Mapa departamentos | Coroplético conteo víctimas NNA + tabla lateral con todos los departamentos |
+| Mapa municipios | Coroplético conteo víctimas NNA + tabla lateral top 20 municipios |
+| Víctimas por sexo | Donut |
+| Víctimas por grupo etario | Barras horizontales con porcentaje en tooltip |
+| Diversidad sexual | Donut LGBTIQ+ vs No identificado |
+| Diversidad étnica | Donut Ninguna / Indígena / Afrodescendiente |
 
-**Definición de Tasa ESCNNA:**
-> Total de víctimas NNA en un territorio y periodo dado, dividido entre la población menor de 18 años en ese mismo territorio y periodo, multiplicado por 100.000.
+### Sección: Tasa de ESCNNA
 
-La tasa se calcula sobre el rango completo de años seleccionados (suma de víctimas / suma de población), no como promedio de tasas anuales.
+**Definición:**
+> Número de víctimas NNA en un territorio y período, dividido entre la población menor de 18 años en ese mismo territorio y período, multiplicado por 100.000.
 
-Cuando se selecciona un departamento en el filtro, los mapas de municipio hacen zoom automáticamente a ese departamento.
+La tasa se calcula sobre el rango de años seleccionado (suma acumulada), no como promedio de tasas anuales.
 
-### Gráficas (6)
-| Gráfica | Tipo | Variables |
-|---|---|---|
-| Histórico de casos y víctimas | Barras + línea (eje dual) | `anio_denuncia`, `total_victimas` |
-| Víctimas por sexo | Donut | `sexo`, `total_victimas` |
-| Víctimas por grupo etario | Barras horizontales | `grupo_etario`, `total_victimas` |
-| Identidad y etnia | Barras horizontales | `aplica_lgbti`, `indigena`, `afrodescendiente` |
-| Estado de casos por año | Barras apiladas | `estado`, `anio_denuncia` |
-| Top 15 delitos por víctimas NNA | Barras horizontales | `delito`, `total_victimas_nna` |
+| Componente | Descripción |
+|---|---|
+| Mapa tasa departamentos | Coroplético tasa de ESCNNA + tabla lateral |
+| Mapa tasa municipios | Coroplético tasa de ESCNNA + tabla top 20 |
+| Histórico tasa | Línea con área rellena — no afectado por filtro de año |
+
+### Sección: Justicia y Delitos
+
+| Componente | Descripción |
+|---|---|
+| Top 15 delitos | Barras horizontales con porcentaje en tooltip |
+| Etapa de casos por año | Barras apiladas por `etapa_caso` |
 
 ### Paleta de colores
 
-**Primarios:** `#0c71e3` `#003893` `#17365d` `#0f4861` `#366091`
+**Primarios:** `#0c71e3` · `#003893` · `#17365d` · `#0f4861` · `#366091`
 
-**Secundarios:** `#02c3ec` `#d5d5ff` `#C3a5fb` `#7030a0` `#FFde59` `#ff1616` `#2ecc71` `#f39c12` `#1abc9c` `#95a5a6`
+**Secundarios:** `#02c3ec` · `#d5d5ff` · `#C3a5fb` · `#7030a0` · `#FFde59` · `#ff1616` · `#2ecc71` · `#f39c12` · `#1abc9c` · `#95a5a6`
 
 ---
 
@@ -194,19 +207,19 @@ Cuando se selecciona un departamento en el filtro, los mapas de municipio hacen 
 ```
 dash_valientes/
 ├── scripts/
-│   ├── etl.py              # Pipeline ETL completo
+│   ├── etl.py              # Pipeline ETL — SPOA + DANE
 │   └── app.py              # Dash web app
 ├── assets/
 │   └── geojson/
 │       ├── departamentos.geojson
 │       └── municipios.geojson
-├── data/                   # Generado por el ETL (en .gitignore)
+├── data/                   # CSVs versionados en el repo (actualizados por ETL)
 │   ├── victimas.csv
 │   ├── poblacion_depto.csv
 │   └── poblacion_mpio.csv
 ├── .github/
 │   └── workflows/
-│       └── data_pipeline.yml
+│       └── data_pipeline.yml   # Cron: ejecuta ETL y hace commit de datos
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -225,11 +238,11 @@ python -m venv C:\venv\web-app-valientes
 ### 2. Activar el ambiente
 
 ```bash
-# Windows (CMD)
-C:\venv\web-app-valientes\Scripts\activate.bat
-
 # Windows (PowerShell)
 C:\venv\web-app-valientes\Scripts\Activate.ps1
+
+# Windows (CMD)
+C:\venv\web-app-valientes\Scripts\activate.bat
 
 # macOS / Linux
 source C:/venv/web-app-valientes/bin/activate
@@ -241,15 +254,15 @@ source C:/venv/web-app-valientes/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Ejecutar el ETL (genera los CSV en `data/`)
+### 4. (Opcional) Correr el ETL para actualizar los datos
 
 ```bash
 python scripts/etl.py
 ```
 
-> El ETL descarga ~200 MB de archivos del DANE. Tarda entre 5 y 10 minutos dependiendo de la conexión.
+> Descarga ~200 MB del DANE. Tarda entre 5 y 10 minutos según la conexión. Los CSV ya están en el repositorio, por lo que este paso solo es necesario para actualizar los datos.
 
-### 5. Correr la app localmente
+### 5. Correr la app
 
 ```bash
 python scripts/app.py
@@ -266,8 +279,16 @@ Abre el browser en **http://127.0.0.1:8050**
    - **Runtime:** Python
    - **Build Command:** `pip install -r requirements.txt`
    - **Start Command:** `gunicorn scripts.app:server`
-3. Los datos (`data/`) deben estar presentes en el repo o el ETL debe correr como paso de build
+3. Activar **Auto-Deploy** en el branch principal — Render redesplegará automáticamente cada vez que el ETL haga push de datos nuevos
 
-Render redespliega automáticamente cada vez que se hace push al branch principal.
+### Automatización del ETL
 
-> **Nota:** La carpeta `data/` está en `.gitignore` para desarrollo local, pero debe incluirse en el repositorio para que Render tenga acceso a los datos sin requerir ejecutar el ETL en cada deploy. Considera quitarla del `.gitignore` para producción o configurar el ETL como Build Command.
+El workflow `.github/workflows/data_pipeline.yml` se ejecuta automáticamente los lunes primero y tercero de cada mes (2 AM UTC) y también puede dispararse manualmente desde GitHub Actions. Al finalizar, hace commit y push de los CSV actualizados al repositorio, lo que activa el redespliegue en Render.
+
+```yaml
+# Disparadores
+on:
+  schedule:
+    - cron: '0 2 1-7,15-21 * 1'  # Lunes 1°-7° y 15°-21° de cada mes
+  workflow_dispatch:               # Ejecución manual
+```
