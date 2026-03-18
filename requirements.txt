@@ -3,8 +3,6 @@ numpy
 sodapy
 requests
 openpyxl
-geopandas
-fiona
 dash
 dash-bootstrap-components
 plotly
