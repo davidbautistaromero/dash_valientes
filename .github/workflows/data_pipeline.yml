@@ -2,35 +2,33 @@ name: Data Pipeline
 
 on:
   schedule:
-    - cron: '0 2 1-7,15-21 * 1'   
-  workflow_dispatch:
+    - cron: '0 2 1-7,15-21 * 1'   # Lunes 1°-7° y 15°-21° de cada mes, 2 AM UTC
+  workflow_dispatch:                 # Ejecución manual desde GitHub
 
 jobs:
-  extract-load:
+  etl:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Configurar credenciales GCP
-        env:
-          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
-        run: |
-          echo "$GCP_SERVICE_ACCOUNT_JSON" > service_account.json
-        shell: bash
-
-      - name: Extraer y guardar datos
+      - name: Extraer y transformar datos (ETL)
         run: python scripts/etl.py
 
-      - name: Subir CSV a Google Drive
-        env:
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
-          GCP_SERVICE_ACCOUNT_PATH: service_account.json
-        run: python scripts/upload_to_drive.py
+      - name: Confirmar y publicar datos actualizados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "etl: actualizar datos [$(date '+%Y-%m-%d')]"
+          git push
