@@ -244,10 +244,11 @@ def etl_dane_depto_process():
     for name, url in links.items():
         _process_dane_depto_file(name, url)
 
-    df_2005 = pd.read_excel("pob_depto_2005_2019.xlsx")
-    df_2020 = pd.read_excel("pob_depto_2020_2050.xlsx")
+    df_2005 = pd.read_excel("pob_depto_2005_2019.xlsx", dtype={'cod_dep': str})
+    df_2020 = pd.read_excel("pob_depto_2020_2050.xlsx", dtype={'cod_dep': str})
 
     df_combined = pd.concat([df_2005, df_2020], axis=0, ignore_index=True)
+    df_combined['cod_dep'] = df_combined['cod_dep'].astype(str).str.zfill(2)
     df_combined = df_combined.sort_values(['cod_dep', 'AÑO']).reset_index(drop=True)
 
     os.makedirs('data', exist_ok=True)
