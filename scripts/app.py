@@ -584,17 +584,19 @@ def update_all(anios, grupos, depto, delitos):
     tbl_mun_count = rank_table(mun_rows, 'Municipio',    'Víctimas', max_height='742px')
 
     # ── Tasas ─────────────────────────────────────────────────────────────────
+    n_years = len(years_sel)
+
     pop_dep = (df_dep_pop[df_dep_pop['AÑO'].isin(years_sel)]
                .groupby('cod_dep', as_index=False)['Total'].sum())
     pop_mun = (df_mun_pop[df_mun_pop['AÑO'].isin(years_sel)]
                .groupby('cod_mun', as_index=False)['Total'].sum())
 
     dep_tasa = dep_cnt.merge(pop_dep, on='cod_dep', how='left')
-    dep_tasa['victimas'] = (dep_tasa['victimas'] / dep_tasa['Total'] * 100_000).round(2)
+    dep_tasa['victimas'] = (dep_tasa['victimas'] / dep_tasa['Total'] * 100_000 / n_years).round(2)
     dep_tasa = dep_tasa.dropna(subset=['victimas'])
 
     mun_tasa = mun_cnt.merge(pop_mun, on='cod_mun', how='left')
-    mun_tasa['victimas'] = (mun_tasa['victimas'] / mun_tasa['Total'] * 100_000).round(2)
+    mun_tasa['victimas'] = (mun_tasa['victimas'] / mun_tasa['Total'] * 100_000 / n_years).round(2)
     mun_tasa = mun_tasa.dropna(subset=['victimas'])
 
     fig_dep_tasa = choropleth(dep_tasa, geojson_dep, 'cod_dep', 'properties.cod_dep',
