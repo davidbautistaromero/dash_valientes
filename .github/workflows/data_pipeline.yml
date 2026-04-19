@@ -32,3 +32,7 @@ jobs:
           git add data/
           git diff --cached --quiet || git commit -m "etl: actualizar datos [$(date '+%Y-%m-%d')]"
           git push
+
+      - name: Sincronizar con Hugging Face Spaces
+        run: |
+          git push https://dbautista98:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/dbautista98/observatorio-escnna.git master:main
