@@ -374,30 +374,16 @@ app.layout = dbc.Container(fluid=True,
     # ══════════════════════════════════════════════════════════════════════════
     # SECCIÓN: TASA DE ESCNNA
     # ══════════════════════════════════════════════════════════════════════════
-    section_title('Tasa de ESCNNA'),
+    html.Div(id='section-tasa-title'),
 
-    dbc.Row(dbc.Col(html.Div([
-        html.P(
-            'Es evidente que los territorios con mayor número de habitantes pueden presentar mayor número de '
-            'víctimas y casos. Por lo tanto, es necesario controlar por el tamaño poblacional para tener un '
-            'panorama más claro del delito. Esto se resuelve construyendo una tasa que tenga en cuenta esta situación.',
-            className='mb-3',
-        ),
-        html.P([html.Strong('- La Tasa de ESCNNA: '),
-                'Se define como el ',
-                html.Strong('número de víctimas de ESCNNA por cada 100.000 habitantes menores de edad')]),
-        html.P([html.Strong('- La Tasa de Trata con NNA:  '),
-                'Se define como el ',
-                html.Strong('número de víctimas de Trata con NNA por cada 100.000 habitantes menores de edad')],
-               className='mb-0'),
-    ], style=INFO_STYLE)), className='mb-3'),
+    html.Div(id='info-tasa', className='mb-3'),
 
     # Mapa tasa departamentos + tabla
     dbc.Card(dbc.CardBody(
         dbc.Row([
             dbc.Col(dcc.Graph(id='map-dep-tasa', config={'displayModeBar': False}), md=8),
             dbc.Col([
-                html.P('Tasa de ESCNNA por departamento', style={**FILTER_LABEL, 'marginBottom': '8px'}),
+                html.P(id='lbl-tasa-dep', style={**FILTER_LABEL, 'marginBottom': '8px'}),
                 html.Div(id='table-dep-tasa'),
             ], md=4, style={'paddingTop': '12px'}),
         ], className='g-2')
@@ -408,7 +394,7 @@ app.layout = dbc.Container(fluid=True,
         dbc.Row([
             dbc.Col(dcc.Graph(id='map-mun-tasa', config={'displayModeBar': False}), md=8),
             dbc.Col([
-                html.P('Top 20 municipios por tasa', style={**FILTER_LABEL, 'marginBottom': '8px'}),
+                html.P(id='lbl-tasa-mun', style={**FILTER_LABEL, 'marginBottom': '8px'}),
                 html.Div(id='table-mun-tasa'),
             ], md=4, style={'paddingTop': '12px'}),
         ], className='g-2')
@@ -450,7 +436,11 @@ app.layout = dbc.Container(fluid=True,
      Output('table-mun-tasa',  'children'),
      Output('chart-hist-tasa', 'figure'),
      Output('chart-delito',    'figure'),
-     Output('chart-estado',    'figure')],
+     Output('chart-estado',    'figure'),
+     Output('section-tasa-title', 'children'),
+     Output('info-tasa',          'children'),
+     Output('lbl-tasa-dep',       'children'),
+     Output('lbl-tasa-mun',       'children')],
     [Input('f-anio',   'value'),
      Input('f-grupo',  'value'),
      Input('f-depto',  'value'),
@@ -462,13 +452,40 @@ def update_all(anios, grupos, depto, delitos):
 
     empty_t = html.P('Sin datos', style={'color': C_GRAY, 'fontSize': '0.8rem'})
 
+    # ── Etiqueta dinámica según grupo seleccionado ────────────────────────────
+    if grupos and grupos == ['Trata de Personas']:
+        tasa_nombre = 'Trata con NNA'
+    elif grupos and set(grupos) == set(GRUPOS):
+        tasa_nombre = 'ESCNNA y Trata'
+    else:
+        tasa_nombre = 'ESCNNA'
+
+    _INTRO = ('Es evidente que los territorios con mayor número de habitantes pueden '
+              'presentar mayor número de víctimas y casos. Por lo tanto, es necesario '
+              'controlar por el tamaño poblacional para tener un panorama más claro del '
+              'delito. Esto se resuelve construyendo una tasa que tenga en cuenta esta situación.')
+    _DEFS = {
+        'ESCNNA':        [html.Strong('La Tasa de ESCNNA: '), 'Se define como el ',
+                          html.Strong('número de víctimas de ESCNNA por cada 100.000 habitantes menores de edad')],
+        'Trata con NNA': [html.Strong('La Tasa de Trata con NNA: '), 'Se define como el ',
+                          html.Strong('número de víctimas de Trata con NNA por cada 100.000 habitantes menores de edad')],
+        'ESCNNA y Trata':[html.Strong('La Tasa de ESCNNA y Trata: '), 'Se define como el ',
+                          html.Strong('número de víctimas de ESCNNA y Trata con NNA por cada 100.000 habitantes menores de edad')],
+    }
+    info_tasa = html.Div([html.P(_INTRO, className='mb-3'),
+                          html.P(_DEFS[tasa_nombre], className='mb-0')], style=INFO_STYLE)
+    section_tasa = section_title(f'Tasa de {tasa_nombre}')
+
     if dff.empty and dff_full.empty:
         empty = empty_fig()
         return ([kpi_card('Sin datos', 0)] * 2 +
                 [empty_fig(height=780), empty_t] * 2 +
                 [empty] * 5 +
                 [empty_fig(height=780), empty_t] * 2 +
-                [empty] * 3)
+                [empty] * 3 +
+                [section_tasa, info_tasa,
+                 f'Tasa de {tasa_nombre} por departamento',
+                 f'Top 20 municipios por tasa de {tasa_nombre.lower()}'])
 
     # ── Años para join con población ──────────────────────────────────────────
     years_sel = list(range(int(anios[0]), int(anios[1]) + 1)) if anios else YEARS
@@ -584,35 +601,33 @@ def update_all(anios, grupos, depto, delitos):
     tbl_mun_count = rank_table(mun_rows, 'Municipio',    'Víctimas', max_height='742px')
 
     # ── Tasas ─────────────────────────────────────────────────────────────────
-    n_years = len(years_sel)
-
     pop_dep = (df_dep_pop[df_dep_pop['AÑO'].isin(years_sel)]
                .groupby('cod_dep', as_index=False)['Total'].sum())
     pop_mun = (df_mun_pop[df_mun_pop['AÑO'].isin(years_sel)]
                .groupby('cod_mun', as_index=False)['Total'].sum())
 
     dep_tasa = dep_cnt.merge(pop_dep, on='cod_dep', how='left')
-    dep_tasa['victimas'] = (dep_tasa['victimas'] / dep_tasa['Total'] * 100_000 / n_years).round(2)
+    dep_tasa['victimas'] = (dep_tasa['victimas'] / dep_tasa['Total'] * 100_000).round(2)
     dep_tasa = dep_tasa.dropna(subset=['victimas'])
 
     mun_tasa = mun_cnt.merge(pop_mun, on='cod_mun', how='left')
-    mun_tasa['victimas'] = (mun_tasa['victimas'] / mun_tasa['Total'] * 100_000 / n_years).round(2)
+    mun_tasa['victimas'] = (mun_tasa['victimas'] / mun_tasa['Total'] * 100_000).round(2)
     mun_tasa = mun_tasa.dropna(subset=['victimas'])
 
     fig_dep_tasa = choropleth(dep_tasa, geojson_dep, 'cod_dep', 'properties.cod_dep',
-                               COLORSCALE_RATE, 'Tasa de ESCNNA', 'departamento_hecho', ':.2f',
-                               title='Tasa de ESCNNA por departamento', bounds=_DEP_BOUNDS)
+                               COLORSCALE_RATE, f'Tasa de {tasa_nombre}', 'departamento_hecho', ':.2f',
+                               title=f'Tasa de {tasa_nombre} por departamento', bounds=_DEP_BOUNDS)
     fig_mun_tasa = choropleth(mun_tasa, geo_mun_sel, 'cod_mun', 'properties.cod_mun',
-                               COLORSCALE_RATE, 'Tasa de ESCNNA', 'municipio_hecho', ':.2f',
-                               title='Tasa de ESCNNA por municipio', bounds=mun_bounds)
+                               COLORSCALE_RATE, f'Tasa de {tasa_nombre}', 'municipio_hecho', ':.2f',
+                               title=f'Tasa de {tasa_nombre} por municipio', bounds=mun_bounds)
 
     dep_tasa_rows = [(r['departamento_hecho'], f"{r['victimas']:.2f}")
                      for _, r in dep_tasa.sort_values('victimas', ascending=False).iterrows()]
     mun_tasa_rows = [(r['municipio_hecho'], f"{r['victimas']:.2f}")
                      for _, r in mun_tasa.sort_values('victimas', ascending=False).head(20).iterrows()]
 
-    tbl_dep_tasa = rank_table(dep_tasa_rows, 'Departamento', 'Tasa de ESCNNA', max_height='742px')
-    tbl_mun_tasa = rank_table(mun_tasa_rows, 'Municipio',    'Tasa de ESCNNA', max_height='742px')
+    tbl_dep_tasa = rank_table(dep_tasa_rows, 'Departamento', f'Tasa de {tasa_nombre}', max_height='742px')
+    tbl_mun_tasa = rank_table(mun_tasa_rows, 'Municipio',    f'Tasa de {tasa_nombre}', max_height='742px')
 
     # ── Histórico (sin filtro de año) ─────────────────────────────────────────
     hist = (dff_full.dropna(subset=['anio_denuncia'])
@@ -727,9 +742,9 @@ def update_all(anios, grupos, depto, delitos):
             name='Tasa de ESCNNA',
         ))
         apply_layout(fig_hist_tasa, height=384,
-                     title='Histórico de tasa de ESCNNA por año (×100.000 menores)',
+                     title=f'Histórico de tasa de {tasa_nombre} por año (×100.000 menores)',
                      xaxis=dict(title='Año', tickmode='linear', dtick=1),
-                     yaxis=dict(title='Tasa de ESCNNA', showgrid=True, gridcolor='#eeeeee'),
+                     yaxis=dict(title=f'Tasa de {tasa_nombre}', showgrid=True, gridcolor='#eeeeee'),
                      showlegend=False)
 
     # ── Por delito ────────────────────────────────────────────────────────────
@@ -781,7 +796,10 @@ def update_all(anios, grupos, depto, delitos):
             fig_dep_tasa, tbl_dep_tasa,
             fig_mun_tasa, tbl_mun_tasa,
             fig_hist_tasa,
-            fig_delito, fig_estado)
+            fig_delito, fig_estado,
+            section_tasa, info_tasa,
+            f'Tasa de {tasa_nombre} por departamento',
+            f'Top 20 municipios por tasa de {tasa_nombre.lower()}')
 
 
 if __name__ == '__main__':
