@@ -1,3 +1,13 @@
+---
+title: Observatorio ESCNNA Colombia
+emoji: 🇨🇴
+colorFrom: blue
+colorTo: red
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Aplicativo de Cifras sobre ESCNNA y Trata con NNA en Colombia
 
 Dashboard interactivo para el análisis de la **Explotación Sexual Comercial de Niñas, Niños y Adolescentes (ESCNNA)** y la **Trata de Personas con NNA** en Colombia.
