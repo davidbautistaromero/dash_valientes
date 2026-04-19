@@ -1,6 +1,6 @@
 ---
 title: Observatorio ESCNNA Colombia
-emoji: 🇨🇴
+emoji: 📊
 colorFrom: blue
 colorTo: red
 sdk: docker
