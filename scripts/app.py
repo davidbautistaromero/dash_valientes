@@ -114,14 +114,22 @@ _DEP_MUN_BOUNDS = {
 }
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
+def _grupo_delitos(grupos):
+    if not grupos:
+        return []
+    g_list = [grupos] if isinstance(grupos, str) else grupos
+    actual = []
+    for g in g_list:
+        actual.extend(GRUPO_MAP.get(g, [g]))
+    return actual
+
+
 def filter_df(anios, grupos, depto, delitos):
     mask = pd.Series(True, index=df.index)
     if anios:
         mask &= df['anio_denuncia'].between(anios[0], anios[1])
-    if grupos:
-        actual = []
-        for g in grupos:
-            actual.extend(GRUPO_MAP.get(g, [g]))
+    actual = _grupo_delitos(grupos)
+    if actual:
         mask &= df['grupo_delito'].isin(actual)
     if depto and depto != 'Todos':
         mask &= df['departamento_hecho'] == depto
@@ -132,10 +140,8 @@ def filter_df(anios, grupos, depto, delitos):
 
 def filter_df_no_year(grupos, depto, delitos):
     mask = pd.Series(True, index=df.index)
-    if grupos:
-        actual = []
-        for g in grupos:
-            actual.extend(GRUPO_MAP.get(g, [g]))
+    actual = _grupo_delitos(grupos)
+    if actual:
         mask &= df['grupo_delito'].isin(actual)
     if depto and depto != 'Todos':
         mask &= df['departamento_hecho'] == depto
@@ -306,7 +312,7 @@ app.layout = dbc.Container(fluid=True,
             html.Label('Grupo de delito', style=FILTER_LABEL),
             dcc.Dropdown(id='f-grupo',
                 options=[{'label': g, 'value': g} for g in GRUPOS],
-                multi=True, placeholder='Todos', style={'fontSize': '0.83rem'}),
+                value='ESCNNA', clearable=False, style={'fontSize': '0.83rem'}),
         ], md=2),
         dbc.Col([
             html.Label('Departamento', style=FILTER_LABEL),
@@ -453,10 +459,8 @@ def update_all(anios, grupos, depto, delitos):
     empty_t = html.P('Sin datos', style={'color': C_GRAY, 'fontSize': '0.8rem'})
 
     # ── Etiqueta dinámica según grupo seleccionado ────────────────────────────
-    if grupos and grupos == ['Trata de Personas']:
+    if grupos == 'Trata de Personas':
         tasa_nombre = 'Trata con NNA'
-    elif grupos and set(grupos) == set(GRUPOS):
-        tasa_nombre = 'ESCNNA y Trata'
     else:
         tasa_nombre = 'ESCNNA'
 
@@ -469,8 +473,6 @@ def update_all(anios, grupos, depto, delitos):
                           html.Strong('número de víctimas de ESCNNA por cada 100.000 habitantes menores de edad')],
         'Trata con NNA': [html.Strong('La Tasa de Trata con NNA: '), 'Se define como el ',
                           html.Strong('número de víctimas de Trata con NNA por cada 100.000 habitantes menores de edad')],
-        'ESCNNA y Trata':[html.Strong('La Tasa de ESCNNA y Trata: '), 'Se define como el ',
-                          html.Strong('número de víctimas de ESCNNA y Trata con NNA por cada 100.000 habitantes menores de edad')],
     }
     info_tasa = html.Div([html.P(_INTRO, className='mb-3'),
                           html.P(_DEFS[tasa_nombre], className='mb-0')], style=INFO_STYLE)
