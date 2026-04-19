@@ -13,6 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -35,4 +37,6 @@ jobs:
 
       - name: Sincronizar con Hugging Face Spaces
         run: |
-          git push --force https://dbautista98:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/dbautista98/observatorio-escnna.git master:main
+          git remote add hf https://dbautista98:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/dbautista98/observatorio-escnna.git
+          git fetch hf
+          git push hf master:main --force
