@@ -35,4 +35,4 @@ jobs:
 
       - name: Sincronizar con Hugging Face Spaces
         run: |
-          git push https://dbautista98:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/dbautista98/observatorio-escnna.git master:main
+          git push --force https://dbautista98:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/dbautista98/observatorio-escnna.git master:main
